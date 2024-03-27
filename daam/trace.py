@@ -26,7 +26,8 @@ class DiffusionHeatMapHooker(AggregateHooker):
             low_memory: bool = False,
             load_heads: bool = False,
             save_heads: bool = False,
-            data_dir: str = None
+            data_dir: str = None,
+            ratio: float = 1.
     ):
         self.all_heat_maps = RawHeatMapCollection()
         h = (pipeline.unet.config.sample_size * pipeline.vae_scale_factor)
@@ -46,7 +47,8 @@ class DiffusionHeatMapHooker(AggregateHooker):
                 latent_hw=self.latent_hw,
                 load_heads=load_heads,
                 save_heads=save_heads,
-                data_dir=data_dir
+                data_dir=data_dir,
+                ratio=ratio
             ) for idx, x in enumerate(self.locator.locate(pipeline.unet))
         ]
 
@@ -197,6 +199,7 @@ class UNetCrossAttentionHooker(ObjectHooker[Attention]):
             load_heads: bool = False,
             save_heads: bool = False,
             data_dir: Union[str, Path] = None,
+            ratio: float = 1.
     ):
         super().__init__(module)
         self.heat_maps = parent_trace.all_heat_maps
@@ -215,6 +218,7 @@ class UNetCrossAttentionHooker(ObjectHooker[Attention]):
 
         self.data_dir = data_dir
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.ratio = ratio
 
     @torch.no_grad()
     def _unravel_attn(self, x):
@@ -230,7 +234,9 @@ class UNetCrossAttentionHooker(ObjectHooker[Attention]):
         Returns:
             `List[Tuple[int, torch.Tensor]]`: the list of heat maps across heads.
         """
-        h = w = int(math.sqrt(x.size(1)))
+        sz = round(x.size(1) / ratio)
+        w = round(math.sqrt(sz))
+        h = round(w * ratio)
         maps = []
         x = x.permute(2, 0, 1)
 
